@@ -1,5 +1,6 @@
 """An Opus-MT microservice that translates text from Arabic to English"""
-
+import uvicorn
+import re
 from fastapi import FastAPI
 from fastapi.openapi.docs import (
     get_redoc_html,
@@ -9,12 +10,12 @@ from fastapi.openapi.docs import (
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import syntok.segmenter as segmenter
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 TOKENIZER = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+
 MODEL = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
 
 # Serve the Swagger API locally
@@ -45,6 +46,11 @@ async def redoc_html():
 class Response(BaseModel):
     translation: str
 
+class TranslateRequestModel(BaseModel):
+    text: str = "الذبانه موتته كل ساعه ها ها ها مات يريد\nهاي شنو هاي شنو السؤال السخيف لا هذا"
+    #text: str = "مرحبا بالعالم" # text in Arabic
+    source: str = "ar"
+    target: str = "en"
 
 def translate_text_ar2en(text: str) -> str:
     """Translate the text from Arabic to English.
@@ -55,35 +61,71 @@ def translate_text_ar2en(text: str) -> str:
     Returns:
         The translated text
     """
-    translation = []
     src_text = []
-    for paragraph in segmenter.analyze(text):
-        for sentence in paragraph:
-            src_text.append("".join(token.spacing + token.value for token in sentence))
-        translated = MODEL.generate(
-            **TOKENIZER(src_text, return_tensors="pt", padding=True)
+    
+    for sentence in text.split("\n"):
+      if sentence == "":
+        continue
+      src_text.append(sentence)
+
+    translated = MODEL.generate(
+        **TOKENIZER(src_text, return_tensors="pt", padding=True)
         )
-        tgt_text = [TOKENIZER.decode(t, skip_special_tokens=True) for t in translated]
-        translation.extend(tgt_text)
-        translation.append("\n")
-        # Translating "\n" leads to the model hallucinating a sentence.
-        src_text.clear()
-    del translation[-1]
-    return " ".join(translation)
+    tgt_text = [TOKENIZER.decode(t, skip_special_tokens=True) for t in translated]
+    
+    postprocessed_text = [remove_repeated_words(t) for t in tgt_text]
+           
+    src_text.clear()
+    return "\n".join(postprocessed_text)
+
+def remove_repeated_words(text):
+    """
+    Removes repeated sequences of words from the text.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: Text without repeated sequences.
+    """
+    # Remove leading and trailing whitespace
+    text = text.strip()
+    
+    # Remove consecutive duplicate words (case-insensitive)
+    text = re.sub(r'\b(\w+)(\s+\1\b)+', r'\1', text, flags=re.IGNORECASE)
+
+    # Pattern to match consecutive repeated phrases
+    pattern = r'(\b.+?\b)(?:\s+\1\b)+'
+
+    # Apply the pattern iteratively to remove any repeated sequences
+    def remove_repeats(text):
+        new_text = re.sub(pattern, r'\1', text, flags=re.IGNORECASE)
+        while new_text != text:
+            text = new_text
+            new_text = re.sub(pattern, r'\1', text, flags=re.IGNORECASE)
+        return new_text
+
+    text = remove_repeats(text)
+
+    return text
 
 
-@app.get("/translate")
-def translate(text: str, source: str="ar", target: str="en") -> Response:
+@app.post("/translate_transcripts")
+def translate_transcripts(request: TranslateRequestModel) -> Response:
     """Translate a single document.
 
     Arguments:
-        text -- A text to be translated
+        request -- TranslateRequestModel containing text and optional source/target languages
     
     Returns:
-        A list of translated sentences.
+        A Response object containing the translated text.
     """
-    if not source.startswith("en"):
+    if not request.source.startswith("ar"):
         return Response(translation="This model translates from Arabic to English")
-    if not target.startswith("de"):
+    if not request.target.startswith("en"):
         return Response(translation="This model translates from Arabic to English")
-    return Response(translation=translate_text(text))
+    return Response(translation=translate_text_ar2en(request.text))
+
+  
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=6777)
