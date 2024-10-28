@@ -1,4 +1,4 @@
-"""An Opus-MT microservice that translates text from English to German"""
+"""An Opus-MT microservice that translates text from Arabic to English"""
 
 from fastapi import FastAPI
 from fastapi.openapi.docs import (
@@ -14,8 +14,8 @@ import syntok.segmenter as segmenter
 app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-TOKENIZER = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-de")
-MODEL = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-de")
+TOKENIZER = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+MODEL = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
 
 # Serve the Swagger API locally
 @app.get("/docs", include_in_schema=False)
@@ -46,8 +46,8 @@ class Response(BaseModel):
     translation: str
 
 
-def translate_text(text: str) -> str:
-    """Translate the text from English to German.
+def translate_text_ar2en(text: str) -> str:
+    """Translate the text from Arabic to English.
 
     Arguments:
         text -- The text to be translated
@@ -73,7 +73,7 @@ def translate_text(text: str) -> str:
 
 
 @app.get("/translate")
-def translate(text: str, source: str="en", target: str="de") -> Response:
+def translate(text: str, source: str="ar", target: str="en") -> Response:
     """Translate a single document.
 
     Arguments:
@@ -83,7 +83,7 @@ def translate(text: str, source: str="en", target: str="de") -> Response:
         A list of translated sentences.
     """
     if not source.startswith("en"):
-        return Response(translation="This model translates from English to German")
+        return Response(translation="This model translates from Arabic to English")
     if not target.startswith("de"):
-        return Response(translation="This model translates from English to German")
+        return Response(translation="This model translates from Arabic to English")
     return Response(translation=translate_text(text))
