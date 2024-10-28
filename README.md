@@ -1,8 +1,8 @@
 # Opus-MT translation service
-This is the companion translation REST service for the OmegaT machine translation available at https://github.com/pikatech/omegat-opus-mt-plugin
 
-It provides an [Opus MT](https://github.com/Helsinki-NLP/Opus-MT) English-to-German model that can be queried via GET requests.
-The only parameter that should be set is the 'text' parameter. While it also takes 'source' and 'target' parameters, those are set to "en" and "de", respectively, by default and should be left alone. They are only needed to check if the query posed by OmegaT is valid. Otherwise, the service will reply: "This model translates from English to German."
+
+It provides an [Opus MT](https://github.com/Helsinki-NLP/Opus-MT) Arabic-English model that can be queried via POST requests.
+The only parameter that should be set is the 'text' parameter. While it also takes 'source' and 'target' parameters, those are set to "ar" and "en", respectively.
 
 After installing the dependencies via the usual
 ```
@@ -18,20 +18,19 @@ docker build .
 ```
 and run the service in a container via
 ```
-docker run -p 8000:80 <IMAGE ID>
+docker run -p 6777:6777 <IMAGE ID>
 ```
-Please change the PyTorch installation settings in the Dockerfile to your needs. By default, it is set up to use the CPU.
+Please change the PyTorch installation settings in the Dockerfile to your needs. By default, it is set up to use the GPU.
 
 ## Example query
 ```
-curl -X 'GET' \
-  'http://localhost:8000/translate?text=I%27m%20an%20example%20text.&source=en&target=de' \
-  -H 'accept: application/json'
-```
-
-Response:
-```
-{
-  "translation": "Ich bin ein Beispieltext."
-}
+curl -X 'POST' \
+  'http://localhost:6777/translate_transcripts' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "text": "الذبانه موتته كل ساعه ها ها ها مات يريد\nهاي شنو هاي شنو السؤال السخيف لا هذا",
+  "source": "ar",
+  "target": "en"
+}'
 ```
