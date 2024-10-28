@@ -6,7 +6,7 @@ RUN pip3 install torch==2.0.0 --index-url https://download.pytorch.org/whl/cpu
 
 COPY requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
-RUN python -c 'from transformers import AutoTokenizer, AutoModelForSeq2SeqLM; tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-de"); model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-de")'
+RUN python -c 'from transformers import AutoTokenizer, AutoModelForSeq2SeqLM; tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en"); model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-ar-en")'
 
 COPY static static
 COPY opus_mt.py opus_mt.py
