@@ -10,6 +10,7 @@ from fastapi.openapi.docs import (
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -17,6 +18,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 TOKENIZER = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
 
 MODEL = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+
+device = torch.device('cuda:0')
+
+MODEL.to(device)
 
 # Serve the Swagger API locally
 @app.get("/docs", include_in_schema=False)
@@ -69,18 +74,36 @@ def translate_text_ar2en(text: str) -> str:
       src_text.append(sentence)
 
     translated = MODEL.generate(
-        **TOKENIZER(src_text, return_tensors="pt", padding=True)
+        **TOKENIZER(src_text, return_tensors="pt", padding=True).to(device),
+        repetition_penalty=1.5
         )
     tgt_text = [TOKENIZER.decode(t, skip_special_tokens=True) for t in translated]
     
-    postprocessed_text = [remove_repeated_words(t) for t in tgt_text]
+    postprocessed_text = [post_process_translation(t) for t in tgt_text]
            
     src_text.clear()
     return "\n".join(postprocessed_text)
 
+def post_process_translation(translated_text):
+    """
+    Improves the quality of translated English text by removing repeated words,
+    cleaning up punctuation, and correcting grammatical errors.
+
+    Args:
+        translated_text (str): The translated English text.
+
+    Returns:
+        str: The post-processed text.
+    """
+    # Step 1: Remove repeated words or phrases
+    processed_text = remove_repeated_words(translated_text)
+    # Step 2: Clean up excessive punctuation
+    processed_text = clean_up_punctuation(processed_text)
+    return processed_text
+
 def remove_repeated_words(text):
     """
-    Removes repeated sequences of words from the text.
+    Removes repeated sequences of words from the text, including those separated by punctuation.
 
     Args:
         text (str): The input text.
@@ -88,16 +111,10 @@ def remove_repeated_words(text):
     Returns:
         str: Text without repeated sequences.
     """
-    # Remove leading and trailing whitespace
     text = text.strip()
-    
-    # Remove consecutive duplicate words (case-insensitive)
-    text = re.sub(r'\b(\w+)(\s+\1\b)+', r'\1', text, flags=re.IGNORECASE)
+    # Updated pattern to include varying punctuation within the repeated phrases
+    pattern = r'(\b.+?\b(?:\.*))(?:[\s\.,;:!?-]+\1)+'
 
-    # Pattern to match consecutive repeated phrases
-    pattern = r'(\b.+?\b)(?:\s+\1\b)+'
-
-    # Apply the pattern iteratively to remove any repeated sequences
     def remove_repeats(text):
         new_text = re.sub(pattern, r'\1', text, flags=re.IGNORECASE)
         while new_text != text:
@@ -106,7 +123,26 @@ def remove_repeated_words(text):
         return new_text
 
     text = remove_repeats(text)
+    return text
 
+def clean_up_punctuation(text):
+    """
+    Reduces multiple punctuation marks to a single one.
+
+    Args:
+        text (str): The input text.
+
+    Returns:
+        str: Text with cleaned-up punctuation.
+    """
+    # Replace multiple periods with a single period
+    text = re.sub(r'\.{2,}', '.', text)
+    # Replace multiple exclamation marks with a single one
+    text = re.sub(r'!{2,}', '!', text)
+    # Replace multiple question marks with a single one
+    text = re.sub(r'\?{2,}', '?', text)
+    # Replace mixed punctuation with a single period
+    text = re.sub(r'[\.!?]{2,}', '.', text)
     return text
 
 
