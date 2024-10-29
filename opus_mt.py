@@ -20,7 +20,7 @@ TOKENIZER = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
 
 MODEL = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
 
-device = torch.device('cuda:0')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 MODEL.to(device)
 
