@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Translate text from an input file and write the result to an output file.")
     parser.add_argument("input_file", help="Path to the input file containing text to translate")
     parser.add_argument("output_file", help="Path to the output file where the translated text will be saved")
-    parser.add_argument("--chunk_size", type=int, default=50, help="Number of lines to process per chunk (default: 50)")
+    parser.add_argument("--chunk_size", type=int, default=100, help="Number of lines to process per chunk (default: 50)")
 
     args = parser.parse_args()
 
