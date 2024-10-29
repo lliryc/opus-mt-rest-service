@@ -4,5 +4,9 @@ sentencepiece==0.1.98
 syntok==1.4.4
 transformers==4.27.4
 uvicorn==0.21.1
+<<<<<<< HEAD
 torch==2.5.0
 
+=======
+requests==2.31.0
+>>>>>>> 1c1802ee55859dff9a46459484def0638b35bc77
