@@ -10,6 +10,7 @@ from fastapi.openapi.docs import (
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from multiprocessing import Pool
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -53,29 +54,18 @@ class TranslateRequestModel(BaseModel):
     target: str = "en"
 
 def translate_text_ar2en(text: str) -> str:
-    """Translate the text from Arabic to English.
-
-    Arguments:
-        text -- The text to be translated
-
-    Returns:
-        The translated text
-    """
-    src_text = []
+    """Translate the text from Arabic to English."""
+    src_text = [sentence for sentence in text.split("\n") if sentence != ""]
     
-    for sentence in text.split("\n"):
-      if sentence == "":
-        continue
-      src_text.append(sentence)
-
     translated = MODEL.generate(
         **TOKENIZER(src_text, return_tensors="pt", padding=True)
-        )
-    tgt_text = [TOKENIZER.decode(t, skip_special_tokens=True) for t in translated]
+    )
+    tgt_text = TOKENIZER.batch_decode(translated, skip_special_tokens=True)
     
-    postprocessed_text = [remove_repeated_words(t) for t in tgt_text]
-           
-    src_text.clear()
+    # Process translations in parallel
+    with Pool() as pool:
+        postprocessed_text = pool.map(remove_repeated_words, tgt_text)
+    
     return "\n".join(postprocessed_text)
 
 def remove_repeated_words(text):
