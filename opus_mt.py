@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
+
 
 app = FastAPI(docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -50,7 +51,8 @@ async def redoc_html():
     )
 
 class Response(BaseModel):
-    translation: str
+    translation: str | None
+    error: str | None
 
 class TranslateRequestModel(BaseModel):
     text: str = "الذبانه موتته كل ساعه ها ها ها مات يريد\nهاي شنو هاي شنو السؤال السخيف لا هذا"
@@ -69,8 +71,8 @@ def translate_text_ar2en(text: str) -> str:
     tgt_text = TOKENIZER.batch_decode(translated, skip_special_tokens=True)
     
     # Process translations in parallel
-    with Pool() as pool:
-        postprocessed_text = pool.map(remove_repeated_words, tgt_text)
+    with ThreadPoolExecutor() as executor:
+        postprocessed_text = list(executor.map(post_process_translation, tgt_text))
     
     return "\n".join(postprocessed_text)
 
@@ -147,10 +149,13 @@ def translate_transcripts(request: TranslateRequestModel) -> Response:
         A Response object containing the translated text.
     """
     if not request.source.startswith("ar"):
-        return Response(translation="This model translates from Arabic to English")
+        return Response(error="This model translates from Arabic to English", translation=None)
     if not request.target.startswith("en"):
-        return Response(translation="This model translates from Arabic to English")
-    return Response(translation=translate_text_ar2en(request.text))
+        return Response(error="This model translates from Arabic to English", translation=None)
+    try:
+        return Response(translation=translate_text_ar2en(request.text))
+    except Exception as ex:
+        return Response(error=str(ex), translation=None)
 
   
 if __name__ == "__main__":
